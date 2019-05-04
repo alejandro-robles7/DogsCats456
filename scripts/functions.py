@@ -1,7 +1,5 @@
 # %%
-## import some packages to use
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 import os
 import random
@@ -14,7 +12,6 @@ from keras import layers
 from keras import models
 from keras import optimizers
 from keras.preprocessing.image import ImageDataGenerator
-from keras.preprocessing.image import img_to_array, load_img
 
 
 def get_data_paths(base_path, data_path, sample_size):
@@ -96,7 +93,7 @@ def split_data(x, y, test_size=0.20, random_state=2):
     return X_train, X_val, y_train, y_val
 
 
-def init_model(input_shape, dropout=0.5):
+def small_vgg_16(input_shape, dropout=0.5):
     model = models.Sequential()
     model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=input_shape))
     model.add(layers.MaxPooling2D((2, 2)))
@@ -112,7 +109,7 @@ def init_model(input_shape, dropout=0.5):
     model.add(layers.Dense(1, activation='sigmoid'))
     return model
 
-def process_training_images(x_train, y_train, x_val, y_val, x_test, batch_size):
+def process_training_images(x_train, y_train, x_val, y_val, x_test, batch_size_train=5, batch_size_test=1):
     train_datagen = ImageDataGenerator(rescale=1. / 255,  # Scale the image between 0 and 1
                                        rotation_range=40,
                                        width_shift_range=0.2,
@@ -122,12 +119,11 @@ def process_training_images(x_train, y_train, x_val, y_val, x_test, batch_size):
                                        horizontal_flip=True)
 
     val_datagen = ImageDataGenerator(rescale=1. / 255)  # We do not augment validation data. we only perform rescale
-
     test_datagen = ImageDataGenerator(rescale=1. / 255)
 
-    train_generator = train_datagen.flow(x_train, y_train, batch_size=batch_size)
-    val_generator = val_datagen.flow(x_val, y_val, batch_size=batch_size)
-    test_generator = test_datagen.flow(x_test, batch_size=batch_size)
+    train_generator = train_datagen.flow(x_train, y_train, batch_size=batch_size_train)
+    val_generator = val_datagen.flow(x_val, y_val, batch_size=batch_size_train)
+    test_generator = test_datagen.flow(x_test, batch_size=batch_size_test)
 
     return train_generator, val_generator, test_generator
 
@@ -181,7 +177,8 @@ if __name__ == '__main__':
     # ********* Getting Data Ready *********
 
     # Paths
-    base_path = '../data/perrosygatos/'
+    # base_path = '../data/perrosygatos/'
+    base_path = 'data/perrosygatos/'
     data_path = ['train', 'test1']
 
     # Lets declare our image dimensions we are using coloured images.
@@ -190,20 +187,20 @@ if __name__ == '__main__':
     channels = 3
 
     # Sample Data for fast prototyping
-    sample_size = 2000
-
+    sample_size_train = 2000
+    sample_size_test = 100
     # Getting Data
-    train_images, test_images = get_data_paths(base_path, data_path, sample_size=sample_size)
+    train_images, test_images = get_data_paths(base_path, data_path, sample_size=sample_size_train)
     X, y = read_and_process_image(train_images, n_rows, n_columns)
-    X_test, y_test = read_and_process_image(test_images[:sample_size])
+    X_test, y_test = read_and_process_image(test_images[:sample_size_test], n_rows, n_columns)
     plot_labels(y)
     print("Shape of train images is:", X.shape)
     print("Shape of labels is:", y.shape)
 
     # Split Data
     X_train, X_val, y_train, y_val = split_data(X, y)
-    ntrain = len(X_train)
-    nval = len(X_val)
+    n_train = len(X_train)
+    n_val = len(X_val)
 
 
     # clearing memory
@@ -217,33 +214,42 @@ if __name__ == '__main__':
 
     # Parameters
     os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-    batch_size = 32
+    batch_size_train = 5 #32
+    batch_size_test = 1
     dropout = 0.5
-    epochs = 64
+    epochs = 3 #64
     learning_rate = 1e-4
     loss_metric = 'binary_crossentropy'
     validation_metric = 'acc'
     input_shape = (n_rows, n_columns, channels)
 
-    model = init_model(input_shape, dropout)
+    # Where to save model
+    model_weights_path = 'model_weights.h5'
+    model_path = 'model_keras.h5'
+
+
+    model = small_vgg_16(input_shape, dropout)
     model.summary()
     model.compile(loss=loss_metric, optimizer=optimizers.RMSprop(lr=learning_rate), metrics=[validation_metric])
 
-    train_generator, validation_generator, test_generator = process_training_images(X_train, y_train,
-                                                                                    X_val, y_val,
-                                                                                    X_test,
-                                                                                    batch_size)
+    train_generator, validation_generator, test_generator = process_training_images(X_train, y_train
+                                                                                    , X_val, y_val
+                                                                                    , X_test
+                                                                                    , batch_size_train
+                                                                                    , batch_size_test)
 
     # The training part
     history = model.fit_generator(train_generator,
-                                  steps_per_epoch=ntrain // batch_size,
+                                  steps_per_epoch=n_train // batch_size_train,
                                   epochs=epochs,
                                   validation_data=validation_generator,
-                                  validation_steps=nval // batch_size)
+                                  validation_steps=n_val // batch_size_train)
+
+    plot_history(history)
 
     # Save the model
-    model.save_weights('model_wieghts.h5')
-    model.save('model_keras.h5')
+    model.save_weights(model_weights_path)
+    model.save(model_path)
 
     # Predicted Labels
     predicted_labels = predict_and_plot(model, test_generator)
