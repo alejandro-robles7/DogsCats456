@@ -23,9 +23,8 @@ def get_data_paths(base_path, data_path, sample_size):
     train_fullpath, test_fullpath = train_dir + '/{}', test_dir + '/{}'
 
     train_dogs = [train_fullpath.format(i) for i in os.listdir(train_dir) if 'dog' in i]  # get dog images
-    train_cats = [test_fullpath.format(i) for i in os.listdir(train_dir) if 'cat' in i]  # get cat images
+    train_cats = [train_fullpath.format(i) for i in os.listdir(train_dir) if 'cat' in i]  # get cat images
 
-    # TODO what to do with test_imgs
     test_imgs = [test_fullpath.format(i) for i in os.listdir(test_dir)]  # get test images
 
     train_imgs = train_dogs[:sample_size] + train_cats[:sample_size]  # slice the dataset and use 2000 in each class
@@ -36,7 +35,7 @@ def get_data_paths(base_path, data_path, sample_size):
     del train_cats
     gc.collect()  # collect garbage to save memory
 
-    return train_imgs
+    return train_imgs, test_imgs
 
 def get_directory():
     dirpath = os.getcwd()
@@ -113,7 +112,7 @@ def init_model(input_shape, dropout=0.5):
     model.add(layers.Dense(1, activation='sigmoid'))
     return model
 
-def process_images(x_train, y_train, x_test, y_test, batch_size):
+def process_training_images(x_train, y_train, x_val, y_val, x_test, batch_size):
     train_datagen = ImageDataGenerator(rescale=1. / 255,  # Scale the image between 0 and 1
                                        rotation_range=40,
                                        width_shift_range=0.2,
@@ -124,9 +123,58 @@ def process_images(x_train, y_train, x_test, y_test, batch_size):
 
     val_datagen = ImageDataGenerator(rescale=1. / 255)  # We do not augment validation data. we only perform rescale
 
+    test_datagen = ImageDataGenerator(rescale=1. / 255)
+
     train_generator = train_datagen.flow(x_train, y_train, batch_size=batch_size)
-    test_generator = val_datagen.flow(x_test, y_test, batch_size=batch_size)
-    return train_generator, test_generator
+    val_generator = val_datagen.flow(x_val, y_val, batch_size=batch_size)
+    test_generator = test_datagen.flow(x_test, batch_size=batch_size)
+
+    return train_generator, val_generator, test_generator
+
+def plot_history(history):
+    # lets plot the train and val curve
+    # get the details form the history object
+    acc = history.history['acc']
+    val_acc = history.history['val_acc']
+    loss = history.history['loss']
+    val_loss = history.history['val_loss']
+
+    epochs = range(1, len(acc) + 1)
+
+    # Train and validation accuracy
+    plt.plot(epochs, acc, 'b', label='Training accurarcy')
+    plt.plot(epochs, val_acc, 'r', label='Validation accurarcy')
+    plt.title('Training and Validation accurarcy')
+    plt.legend()
+
+    plt.figure()
+    # Train and validation loss
+    plt.plot(epochs, loss, 'b', label='Training loss')
+    plt.plot(epochs, val_loss, 'r', label='Validation loss')
+    plt.title('Training and Validation loss')
+    plt.legend()
+
+    plt.show()
+
+
+def predict_and_plot(model, test_generator, columns=5):
+    text_labels = []
+    plt.figure(figsize=(30, 20))
+    for i, batch in enumerate(test_generator):
+        pred = model.predict(batch)
+        if pred > 0.5:
+            text_labels.append('dog')
+        else:
+            text_labels.append('cat')
+        plt.subplot(5 / columns + 1, columns, i + 1)
+        plt.title('This is a ' + text_labels[i])
+        imgplot = plt.imshow(batch[0])
+        i += 1
+        if i % 10 == 0:
+            break
+    plt.show()
+    return text_labels
+
 
 if __name__ == '__main__':
 
@@ -145,8 +193,9 @@ if __name__ == '__main__':
     sample_size = 2000
 
     # Getting Data
-    train_imgs = get_data_paths(base_path, data_path, sample_size=sample_size)
-    X, y = read_and_process_image(train_imgs, n_rows, n_columns)
+    train_images, test_images = get_data_paths(base_path, data_path, sample_size=sample_size)
+    X, y = read_and_process_image(train_images, n_rows, n_columns)
+    X_test, y_test = read_and_process_image(test_images[:sample_size])
     plot_labels(y)
     print("Shape of train images is:", X.shape)
     print("Shape of labels is:", y.shape)
@@ -158,7 +207,7 @@ if __name__ == '__main__':
 
 
     # clearing memory
-    del train_imgs
+    del train_images
     del X
     del y
     gc.collect()
@@ -180,11 +229,23 @@ if __name__ == '__main__':
     model.summary()
     model.compile(loss=loss_metric, optimizer=optimizers.RMSprop(lr=learning_rate), metrics=[validation_metric])
 
-    train_generator, test_generator = process_images(X_train, X_val, y_train, y_val, batch_size)
+    train_generator, validation_generator, test_generator = process_training_images(X_train, y_train,
+                                                                                    X_val, y_val,
+                                                                                    X_test,
+                                                                                    batch_size)
 
     # The training part
     history = model.fit_generator(train_generator,
                                   steps_per_epoch=ntrain // batch_size,
                                   epochs=epochs,
-                                  validation_data=test_generator,
+                                  validation_data=validation_generator,
                                   validation_steps=nval // batch_size)
+
+    # Save the model
+    model.save_weights('model_wieghts.h5')
+    model.save('model_keras.h5')
+
+    # Predicted Labels
+    predicted_labels = predict_and_plot(model, test_generator)
+
+
