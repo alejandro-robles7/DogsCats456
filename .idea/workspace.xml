@@ -4,7 +4,6 @@
     <list default="true" id="612caf38-a384-4490-8c5a-a53a805cec1e" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/scripts/extra_credit.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/extra_credit.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/functions.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/functions.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -149,12 +148,12 @@
       <workItem from="1556849448905" duration="1062000" />
       <workItem from="1556943663795" duration="4898000" />
       <workItem from="1556958604330" duration="15450000" />
-      <workItem from="1557009686170" duration="843000" />
+      <workItem from="1557009686170" duration="1373000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="25275000" />
+    <option name="totallyTimeSpent" value="25805000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="0" y="23" width="1920" height="1057" extended-state="0" />
